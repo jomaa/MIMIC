@@ -1,5 +1,5 @@
 (******************************************************************************)
-(*  © Université Lille 1 (2014-2016)                                          *)
+(*  © Université Lille 1 (2014-2017)                                          *)
 (*                                                                            *)
 (*  This software is a computer program whose purpose is to run a minimal,    *)
 (*  hypervisor relying on proven properties such as memory isolation.         *)
@@ -126,85 +126,6 @@ unfold consistent in *;intuition.
 Qed.
 
 
-Lemma  read_phy_addr_invariant (phy_addr : nat): 
-{{ fun s :state => isolation s.(data) s.(process_list)  /\ consistent s   }}
- read_phy_addr phy_addr
-{{ fun index (s :state) => isolation s.(data) s.(process_list)  /\ consistent s  }}.
-Proof.
-eapply weaken.
-eapply read_phy_addr_wp.
-simpl.
-intros.
-case_eq (lt_dec phy_addr  (length (data s)) ).
-+ left;intuition.
-+ right;intuition.
-Qed.
-
-Lemma  read_invariant (Vaddr : nat): 
-{{ fun s :state => isolation s.(data) s.(process_list)  /\ consistent s   }}
- read Vaddr
-{{ fun index (s :state) => isolation s.(data) s.(process_list)  /\ consistent s  }}.
-Proof.
-unfold read. 
-eapply bind_wp_rev.
- + eapply translate_invariant.
- + intros a.
-   destruct a.
-   - eapply weaken.
-     eapply read_phy_addr_wp.
-     simpl.
-     intros.
-     case_eq (lt_dec n  (length (data s)) ).
-      * left;intuition.
-      * right;intuition.
-   - destruct e.
-     * eapply weaken.
-       eapply ret_wp.
-       intuition.
-       (*eapply bind_wp_rev.
-       eapply weaken.
-       eapply add_interruption_invariant.
-       intros.
-       intuition.
-       intros [].
-       eapply weaken.
-       eapply ret_wp.
-       intuition. *)
-     * eapply weaken.
-       eapply ret_wp.
-       intuition.
-Qed.
-
-Lemma assign_invariant (v : nat) : 
-{{ fun s :state => isolation s.(data) s.(process_list)  /\ consistent s   }}
- assign v
-{{ fun index (s :state) => isolation s.(data) s.(process_list)  /\ consistent s  }}.
-Proof.
-eapply weaken.
-eapply assign_wp.
-simpl.
-intros.
-unfold consistent in *;intuition.
-Qed.
-
-
-Lemma load_invariant (v : nat) : 
-{{ fun s :state => isolation s.(data) s.(process_list)  /\ consistent s   }}
- load v
-{{ fun index (s :state) => isolation s.(data) s.(process_list)  /\ consistent s  }}.
-Proof.
-unfold load.
-eapply bind_wp_rev.
-+ eapply read_invariant.
-+ destruct a. 
-  - eapply assign_invariant.
-  -   eapply assign_invariant. 
-  (*simpl. eapply weaken. 
-    eapply ret_wp.
-    intuition.*) 
-Qed.
-
-
 Lemma halt_invariant : 
 {{ fun s : state => isolation (data s) (process_list s) /\ consistent s }} 
   halt {{ fun (_ : unit) (s : state) =>
@@ -224,7 +145,7 @@ unfold reset.
 eapply bind_wp_rev.
 + eapply create_process_invariant.
 + intros [].
-  eapply bind_wp_rev.
-   - eapply create_process_invariant.
-   - intros []. eapply init_current_process_invariant.
+  (* eapply bind_wp_rev.
+   - eapply create_process_invariant. *)
+   eapply init_current_process_invariant.
 Qed.

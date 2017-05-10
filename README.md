@@ -1,59 +1,54 @@
 # Summary
 
-This project is a formal proof of an abstract model of a microkernel
-which supports preemptive scheduling and ensures memory isolation.
+This project is a formal proof of an abstract model of a microkernel which supports preemptive scheduling and ensures memory isolation.  
+# Dependency 
 
-The source code is covered by the CeCILL-A license.
-It was developed by:
+Coq 8.6
 
-- Narjes Jomaa
-- David Nowak
-- Gilles Grimaud
-- Samuel Hym
+# Folder content
 
+   * Makefile
+   * Readme.md
+   * *.v files
 
-# Dependency
-
-Coq 8.5pl2
-
-
-# Organization
+# FILES STRUCTURE
 
 This project is organized in the following way.
 
-- The definition of our hardware monad that provides states is split
-  in the two files `StateMonad.v` and `HMonad.v`.
+* The definition of our hardware monad that provides states is split
+  in the two files StateMonad.v and HMonad.v.
 
-- Our model of a hardware architecture is split into different files:
+* Our model of a hardware architecture is split into different files:
 
-  - The hardware components for the MMU are in `MMU.v`.
+  * he hardware component translate for the MMU is singled out in MMU.v.
 
-  - Access to physical memory is modeled in `MemoryManager.v`.
+  * Memory allocation is modeled in MemoryManager.v by the alloc\_page subroutine.
 
-  - The instruction write is singled out in `Write.v`.
+  * Access to physical memory is modeled in Access.v where the instructions write and read are defined.
 
-  - The dynamic evolution of the system (including interruption
-    management) is modeled in `Instructions.v` and `Step.v`.
+  * The dynamic evolution of the system (i.e. step), including interrupt
+  management (interrupt, fetch\_interrupt, fetch\_instruction
+  and return\_from\_interrupt), is modeled in Instructions.v and
+  Step.v.
 
-- Our model of a microkernel is split into different files:
+* Our model of a microkernel is split into different files:
 
-  - Subroutines `add_pte` and `remove_pte` to modify page tables are
-    in `PageTableManager.v`.
+  * Subroutines add\_pte and remove_pte to modify page tables are in
+    PageTableManager.v.
 
-  - Subroutines `save_process`, `restore_process` and `switch_process` for
-    preemptive CPU-time sharing are in `Scheduler.v`.
+  * Subroutines save\_process, restore\_process and switch\_process for
+    preemptive CPU-time sharing are in Scheduler.v.
 
-  - Process creation and update are in `ProcessManager.v`.
+  * The process creation subroutine create\_process is defined in ProcessManager.v.
 
-- The file `Properties.v` contains the definitions of isolation and
+* The file Properties.v contains the definitions of isolation and
   consistency.
-
-- The proofs of preservation of isolation and consistency are spread
-  between the files `MMU_invariant.v`, `Write_invariants.v`,
-  `Scheduler_invariant.v`, `Instructions_invariants.v`,
-  `ProcessManager_invariant.v`, `Step_invariant.v`, `Alloc_invariants.v`,
-  `Addpte_invariant.v` and `Removepte_invariant.v`.
-
+ 
+* The proofs of preservation of isolation and consistency are spread
+  between the files MMU\_invariant.v, Write\_invariants.v,
+  Scheduler\_invariant.v, Instructions\_invariants.v,
+  ProcessManager\_invariant.v, Step\_invariant.v, Alloc\_invariants.v,
+  Addpte\_invariant.v and Removepte\_invariant.v.
 
 # Building the proof
 

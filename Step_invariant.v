@@ -1,5 +1,5 @@
 (******************************************************************************)
-(*  © Université Lille 1 (2014-2016)                                          *)
+(*  © Université Lille 1 (2014-2017)                                          *)
 (*                                                                            *)
 (*  This software is a computer program whose purpose is to run a minimal,    *)
 (*  hypervisor relying on proven properties such as memory isolation.         *)
@@ -33,8 +33,8 @@
 
 Require Import FunctionalExtensionality Bool List Streams Arith NPeano Omega.
 Import List.ListNotations.
-Require Import Lib HMonad MMU Step Properties LibOs Scheduler_invariant Instructions_invariants Addpte_invariant Write_invariant
-Removepte_invariant.
+Require Import Lib HMonad MMU Step Properties LibOs Scheduler_invariant Instructions_invariants Addpte_invariant Access_invariant
+Removepte_invariant ProcessManager_invariant.
 
 Lemma step_invariant: 
 {{ fun s :state => isolation s.(data) s.(process_list)  /\ consistent s  }}
@@ -69,6 +69,9 @@ destruct inst.
  + eapply bind_wp_rev. 
    eapply incr_pc_invariant. intros []. 
    eapply reset_invariant.
+ + eapply bind_wp_rev. 
+   eapply incr_pc_invariant. intros []. 
+   eapply create_process_invariant.
  + eapply bind_wp_rev. 
    eapply incr_pc_invariant. intros []. 
    eapply remove_pte_invariant.

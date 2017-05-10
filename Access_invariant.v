@@ -1,5 +1,5 @@
 (******************************************************************************)
-(*  © Université Lille 1 (2014-2016)                                          *)
+(*  © Université Lille 1 (2014-2017)                                          *)
 (*                                                                            *)
 (*  This software is a computer program whose purpose is to run a minimal,    *)
 (*  hypervisor relying on proven properties such as memory isolation.         *)
@@ -30,14 +30,93 @@
 (*  The fact that you are presently reading this means that you have had      *)
 (*  knowledge of the CeCILL license and that you accept its terms.            *)
 (******************************************************************************)
-
 Require Import List Arith NPeano Coq.Logic.JMeq Coq.Logic.Classical_Prop Omega.
 Import List.ListNotations .
 Require Import Lib StateMonad HMonad MMU Alloc_invariants Properties LibOs 
-Write PageTableManager MemoryManager MMU_invariant.
+Access PageTableManager MemoryManager MMU_invariant.
 Require Import Coq.Structures.OrderedTypeEx.
 
 Set Printing Projections.
+
+Lemma  read_phy_addr_invariant (phy_addr : nat): 
+{{ fun s :state => isolation s.(data) s.(process_list)  /\ consistent s   }}
+ read_phy_addr phy_addr
+{{ fun index (s :state) => isolation s.(data) s.(process_list)  /\ consistent s  }}.
+Proof.
+eapply weaken.
+eapply read_phy_addr_wp.
+simpl.
+intros.
+case_eq (lt_dec phy_addr  (length (data s)) ).
++ left;intuition.
++ right;intuition.
+Qed.
+
+Lemma  read_invariant (Vaddr : nat): 
+{{ fun s :state => isolation s.(data) s.(process_list)  /\ consistent s   }}
+ read Vaddr
+{{ fun index (s :state) => isolation s.(data) s.(process_list)  /\ consistent s  }}.
+Proof.
+unfold read. 
+eapply bind_wp_rev.
+ + eapply translate_invariant.
+ + intros a.
+   destruct a.
+   - eapply weaken.
+     eapply read_phy_addr_wp.
+     simpl.
+     intros.
+     case_eq (lt_dec n  (length (data s)) ).
+      * left;intuition.
+      * right;intuition.
+   - destruct e.
+     * eapply weaken.
+       eapply ret_wp.
+       intuition.
+       (*eapply bind_wp_rev.
+       eapply weaken.
+       eapply add_interruption_invariant.
+       intros.
+       intuition.
+       intros [].
+       eapply weaken.
+       eapply ret_wp.
+       intuition. *)
+     * eapply weaken.
+       eapply ret_wp.
+       intuition.
+Qed.
+
+Lemma assign_invariant (v : nat) : 
+{{ fun s :state => isolation s.(data) s.(process_list)  /\ consistent s   }}
+ assign v
+{{ fun index (s :state) => isolation s.(data) s.(process_list)  /\ consistent s  }}.
+Proof.
+eapply weaken.
+eapply assign_wp.
+simpl.
+intros.
+unfold consistent in *;intuition.
+Qed.
+
+
+Lemma load_invariant (v : nat) : 
+{{ fun s :state => isolation s.(data) s.(process_list)  /\ consistent s   }}
+ load v
+{{ fun index (s :state) => isolation s.(data) s.(process_list)  /\ consistent s  }}.
+Proof.
+unfold load.
+eapply bind_wp_rev.
++ eapply read_invariant.
++ destruct a. 
+  - eapply assign_invariant.
+  -   eapply assign_invariant. 
+  (*simpl. eapply weaken. 
+    eapply ret_wp.
+    intuition.*) 
+Qed.
+
+
 
 Definition write_aux (val Paddr: nat) := 
 let page := getBase Paddr offset_nb_bits in 
@@ -93,41 +172,6 @@ match Paddr with
 |inr _ => ret tt
 end.
 
-
-Lemma insert_pte_nth s cr3 index pte : 
-forall ffp,  (ffp * page_size )<  (cr3 * page_size) \/  (cr3 * page_size) + page_size  <= (ffp * page_size )->
- memory_length s -> cr3 < nb_page ->
- index < nb_pte -> 
-(List.nth (ffp * page_size) s.(data) nb_page) = (List.nth (ffp * page_size)
-     (firstn (cr3 * page_size) s.(data) ++
-   (firstn index (sublist (cr3 * page_size) nb_pte s.(data)) ++
-    [pte] ++ skipn (index + 1) (sublist (cr3 * page_size) nb_pte s.(data))) ++
-   skipn (cr3 * page_size + nb_pte) s.(data)) nb_page).
-Proof. 
-intros ffp  H HData Hcr3 HIndex.
-destruct H.
- + set (l1 := (firstn index (sublist (cr3 * page_size) nb_pte s.(data)) ++
-    [pte] ++ skipn (index + 1) (sublist (cr3 * page_size) nb_pte s.(data))) ++
-   skipn (cr3 * page_size + nb_pte) s.(data)). 
-   rewrite app_nth1. rewrite firstn_nth.  reflexivity.  assumption. 
-   rewrite length_firstn_le. assumption.
-   unfold memory_length in *. rewrite <- HData. rewrite mult_comm with page_size nb_page.
-   apply mult_le_compat_r. intuition.
-
- + rewrite app_assoc.
-   set(cr3_sublist := firstn index (sublist (cr3 * page_size) nb_pte s.(data)) ++
-   [pte] ++ skipn (index + 1) (sublist (cr3 * page_size) nb_pte s.(data))).
-   set (l1 := (firstn (cr3 * page_size) s.(data) ++ cr3_sublist)). 
-   rewrite app_nth2.
-    - rewrite skipn_nth.
-      unfold l1.
-      rewrite app_length. rewrite length_firstn_le.
-       *  replace (length cr3_sublist) with page_size.
-          rewrite Nat.add_sub_assoc.
-          rewrite minus_plus. reflexivity.
-            { assumption. }
-            {
- 
 Lemma insert_pte_length s cr3 index pte:
 cr3 < nb_page -> 
 memory_length s -> 
@@ -170,7 +214,39 @@ rewrite sublist_length.
    omega. 
 Qed.
 
+Lemma insert_pte_nth s cr3 index pte : 
+forall ffp,  (ffp * page_size )<  (cr3 * page_size) \/  (cr3 * page_size) + page_size  <= (ffp * page_size )->
+ memory_length s -> cr3 < nb_page ->
+ index < nb_pte -> 
+(List.nth (ffp * page_size) s.(data) nb_page) = (List.nth (ffp * page_size)
+     (firstn (cr3 * page_size) s.(data) ++
+   (firstn index (sublist (cr3 * page_size) nb_pte s.(data)) ++
+    [pte] ++ skipn (index + 1) (sublist (cr3 * page_size) nb_pte s.(data))) ++
+   skipn (cr3 * page_size + nb_pte) s.(data)) nb_page).
+Proof. 
+intros ffp  H HData Hcr3 HIndex.
+destruct H.
+ + set (l1 := (firstn index (sublist (cr3 * page_size) nb_pte s.(data)) ++
+    [pte] ++ skipn (index + 1) (sublist (cr3 * page_size) nb_pte s.(data))) ++
+   skipn (cr3 * page_size + nb_pte) s.(data)). 
+   rewrite app_nth1. rewrite firstn_nth.  reflexivity.  assumption. 
+   rewrite length_firstn_le. assumption.
+   unfold memory_length in *. rewrite <- HData. rewrite mult_comm with page_size nb_page.
+   apply mult_le_compat_r. intuition.
 
+ + rewrite app_assoc.
+   set(cr3_sublist := firstn index (sublist (cr3 * page_size) nb_pte s.(data)) ++
+   [pte] ++ skipn (index + 1) (sublist (cr3 * page_size) nb_pte s.(data))).
+   set (l1 := (firstn (cr3 * page_size) s.(data) ++ cr3_sublist)). 
+   rewrite app_nth2.
+    - rewrite skipn_nth.
+      unfold l1.
+      rewrite app_length. rewrite length_firstn_le.
+       *  replace (length cr3_sublist) with page_size.
+          rewrite Nat.add_sub_assoc.
+          rewrite minus_plus. reflexivity.
+            { assumption. }
+            {
   rewrite <- insert_pte_length with s cr3 index pte;intuition. }
 
        * unfold memory_length in *. rewrite <- HData. rewrite mult_comm with page_size nb_page.

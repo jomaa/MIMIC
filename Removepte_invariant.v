@@ -1,5 +1,5 @@
 (******************************************************************************)
-(*  © Université Lille 1 (2014-2016)                                          *)
+(*  © Université Lille 1 (2014-2017)                                          *)
 (*                                                                            *)
 (*  This software is a computer program whose purpose is to run a minimal,    *)
 (*  hypervisor relying on proven properties such as memory isolation.         *)
@@ -3310,7 +3310,7 @@ destruct (process_eq_dec3 x p1 p2) as [H7 | H7].
                   unfold getBase in H. 
                   simpl in H.
                   contradict H. 
-                  destruct Hpage as (Hpage & HF).
+                  (* destruct Hpage as (Hpage & HF). *)
                   generalize (HPage pg1 p1). 
                   intros.
                   apply H0;trivial.                  
@@ -3323,7 +3323,7 @@ destruct (process_eq_dec3 x p1 p2) as [H7 | H7].
                   contradict H. 
                   unfold page_notZero in *. 
                   unfold used_notZero in *.
-                  destruct Hpage as (Hpage & HF).
+(*                   destruct Hpage as (Hpage & HF). *)
                   generalize (HPage pg1 p1). 
                   intros.
                   apply H;trivial. 
@@ -4339,8 +4339,10 @@ intros.
    intros []. 
    eapply weaken. 
    eapply ret_wp. 
-   intuition. 
-   intros [].
+   intuition.
+    case_eq u.
+    intros. subst.
+   (* intros []. *)
     eapply weaken. eapply ret_wp. 
    intros.
    intuition.

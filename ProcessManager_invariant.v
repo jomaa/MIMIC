@@ -1,5 +1,5 @@
 (******************************************************************************)
-(*  © Université Lille 1 (2014-2016)                                          *)
+(*  © Université Lille 1 (2014-2017)                                          *)
 (*                                                                            *)
 (*  This software is a computer program whose purpose is to run a minimal,    *)
 (*  hypervisor relying on proven properties such as memory isolation.         *)
@@ -50,27 +50,38 @@ inversion H0.
     unfold all_used_pages. apply in_flat_map. exists p. 
     split.  assumption. assumption. 
 Qed.
+Lemma permut_or : 
+forall P Q, P \/ Q-> Q \/ P.
+Proof.
+intros.
+intuition.
+Qed.  
 
 (** really free new process prop **)
 Lemma really_free_new_process s:
 forall p1, Not_free s p1.(cr3_save) -> 
        get_mapped_pte p1.(cr3_save) s.(data) = [] -> 
        really_free_aux s.(process_list) s.(data) s.(first_free_page) ->
-really_free_aux (p1:: s.(process_list)) s.(data) s.(first_free_page).
+really_free_aux ( s.(process_list)++[p1]) s.(data) s.(first_free_page).
 Proof.
 intros.
 inversion H.
  + constructor. assumption.
  + constructor 2. 
       - assumption. 
-      - unfold all_used_pages. rewrite in_flat_map. unfold not. intros. destruct H5. destruct H5.
+      - unfold all_used_pages. rewrite in_flat_map. unfold not. intros.
+       destruct H5. destruct H5.
+       rewrite in_app_iff in *.
+       apply  permut_or  in H5. 
         destruct H5.
          * unfold process_used_pages in H6. contradict H6. simpl. unfold not. intros.
            destruct H6.
-            { contradict H6.  subst. assumption. }
+            { contradict H6.  subst. simpl in *. destruct H5; [| now contradict H5]. 
+             subst.  assumption. }
             { inversion H1.  
               + contradict H7. intuition.
-              + subst.  rewrite  H0 in H6. intuition. }
+              + subst. simpl in *. destruct H5; [| now contradict H5]. 
+             subst.  rewrite  H0 in H6. intuition. }
          * unfold process_used_pages in H6. contradict H6. 
            apply free_page_not_used.  assumption. assumption. assumption. 
       - induction H1.
@@ -79,8 +90,12 @@ inversion H.
  { constructor . assumption. }
  { constructor 2.
    +  assumption. 
-   + unfold all_used_pages. rewrite in_flat_map. contradict H7. destruct H7. destruct H7. 
-     destruct H7. subst x. unfold  process_used_pages in H9. rewrite H0 in H9. simpl in H9.
+   + unfold all_used_pages. rewrite in_flat_map. 
+     contradict H7. destruct H7. destruct H7. rewrite in_app_iff in H7.
+     apply permut_or in H7.
+       
+     destruct H7. simpl in *. destruct H7; [| now contradict H7]. 
+              subst x. unfold  process_used_pages in H9. rewrite H0 in H9. simpl in H9.
      destruct H9. destruct H4.  contradict H4. intuition. contradict H9.  assumption. contradict H7. 
      unfold all_used_pages. rewrite in_flat_map. exists x. 
      split. assumption. assumption.
@@ -283,39 +298,61 @@ simpl. unfold consistent, not_cyclic, really_free. simpl in *.
 intros s (HIso & (HRFree  & HNCyc & HData (*& HPTlen*) & HNdup & HPNzero) & HNUsed & HNFree & HMPage & HPTlenCr3 & HCr3n0 ).
 try repeat split;trivial.
 + unfold isolation. intros p1 p2 pg1 H H0 H1 H2 H3.
-  destruct H0 as [H0|H0]; destruct H as [H| H].
-  - contradict H1. rewrite <- H. rewrite <- H0. reflexivity. 
+rewrite in_app_iff in *.
+assert (Hi : In p2 [{| eip := eip_; process_kernel_mode := false; cr3_save := cr3; stack_process := [] |}] 
+\/ In p2 s.(process_list)
+    ) by intuition.
+    clear H.
+assert(Hi0 : In p1 [{| eip := eip_; process_kernel_mode := false; cr3_save := cr3; stack_process := [] |}]
+\/  In p1 s.(process_list) ) by intuition.
+clear H0. 
+  destruct Hi0 as [H0|H0]; destruct Hi as [H| H].
+  - simpl in *. clear H3 H2. intuition.
+    contradict H1. subst. simpl;trivial. 
   - unfold process_used_pages in H2. unfold process_used_pages. unfold not. intros. destruct H2.
      * subst. simpl in *.
        destruct H3 as [H3 |H3].
        {contradict H3. apply not_eq_sym. assumption. }
-       {  destruct HNUsed. unfold all_used_pages. apply in_flat_map.  exists p2. 
-            split. assumption. unfold process_used_pages. apply in_or_app. right. assumption. }
+       {   destruct HNUsed. unfold all_used_pages. apply in_flat_map.  exists p2. 
+            split. assumption. unfold process_used_pages. apply in_or_app. right. 
+            intuition. subst. simpl in *. assumption. }
      * replace ( get_mapped_pte p1.(cr3_save) s.(data)) with ( []: list nat) in H2 . 
        { contradict H2. }
-       { simpl in H2.  unfold any_mapped_page in HMPage . unfold get_mapped_pte in H2. subst.
+       { simpl in H0. destruct H0 as [H0 | H0] ; [| now contradict H0].
+         simpl in H2.  unfold any_mapped_page in HMPage . unfold get_mapped_pte in H2. subst.
          simpl in *. rewrite HMPage in H2. unfold get_mapped_pte. symmetry. assumption. }
   - unfold process_used_pages in H2. unfold process_used_pages. unfold not. intros. destruct H2.
      * subst. simpl in *.
        destruct H3 as [H3 |H3].
        {contradict H3. apply not_eq_sym. assumption. }
-       {  destruct HNUsed. unfold all_used_pages. apply in_flat_map.  exists p1. 
-            split. assumption. unfold process_used_pages. apply in_or_app. right.  
+       { destruct H as [H | H] ; [| now contradict H].
+         destruct HNUsed.
+          unfold all_used_pages. apply in_flat_map.  exists p1. 
+            split. assumption. unfold process_used_pages.
+             apply in_or_app. right.  
             unfold any_mapped_page in HMPage . unfold get_mapped_pte in H3. 
+            subst. simpl in *. 
             rewrite HMPage in H3. contradict H3. }
      * unfold process_used_pages in H3. simpl in H3. destruct H3 as [H3 |H3].
-       { subst.  simpl in *. contradict HNUsed . unfold all_used_pages. apply in_flat_map.  exists p1. 
+       { subst.  simpl in *. destruct H as [H | H] ; [| now contradict H].
+        contradict HNUsed . unfold all_used_pages. apply in_flat_map.  exists p1. 
             split. assumption. unfold process_used_pages. apply in_or_app. right.  
-            unfold any_mapped_page in HMPage . assumption. }
-       { subst. simpl in *. unfold get_mapped_pte in H3. unfold any_mapped_page in HMPage.
+            unfold any_mapped_page in HMPage . subst. simpl.  assumption. }
+       { subst. simpl in *. destruct H as [H | H] ; [| now contradict H]. 
+         unfold get_mapped_pte in H3. unfold any_mapped_page in HMPage.
+         subst. simpl in *. 
          rewrite HMPage in H3. contradict H3. }
    - contradict H3.  unfold isolation in *. apply HIso with p1; trivial.
  + apply really_free_new_process. simpl . assumption. simpl. unfold get_mapped_pte . assumption. 
    assumption.
  + unfold noDuplic_processPages in *. simpl.
    intros.
+   rewrite in_app_iff in H.
+   apply permut_or in H. 
+   simpl in H. 
    destruct H.
-    * unfold  any_mapped_page in *.
+    *  destruct H as [H | H] ; [| now contradict H].  
+      unfold  any_mapped_page in *.
       unfold process_used_pages. simpl. 
       unfold get_mapped_pte. 
       replace p.(cr3_save) with cr3;intuition.
@@ -325,11 +362,12 @@ try repeat split;trivial.
     *   intuition.
     
  + simpl {|
-      process_list := {|
-                      eip := eip_;
-                      process_kernel_mode := false;
-                      cr3_save := cr3;
-                      stack_process := [] |} :: s.(process_list);
+      process_list :=  s.(process_list) ++
+                          [{|
+                           eip := eip_;
+                           process_kernel_mode := false;
+                           cr3_save := cr3;
+                           stack_process := [] |}];
       current_process := s.(current_process);
       cr3 := s.(HMonad.cr3);
       code := s.(code);
@@ -343,11 +381,12 @@ try repeat split;trivial.
       first_free_page := s.(first_free_page) |}.(process_list)   in *.
       simpl  (process_used_pages
           {|
-          process_list := {|
-                          eip := eip_;
-                          process_kernel_mode := false;
-                          cr3_save := cr3;
-                          stack_process := [] |} :: s.(process_list);
+          process_list :=  s.(process_list) ++
+                          [{|
+                           eip := eip_;
+                           process_kernel_mode := false;
+                           cr3_save := cr3;
+                           stack_process := [] |}];
           current_process := s.(current_process);
           cr3 := s.(HMonad.cr3);
           code := s.(code);
@@ -365,10 +404,12 @@ try repeat split;trivial.
 
     destruct HPNzero as ( HUNzero & HFNzero).
     unfold used_notZero in *.
-    
+    rewrite in_app_iff in H.
+    apply permut_or in H.  
     destruct H as [H | H]; destruct H0 as [H0 | H0].
-     - subst. simpl. assumption.
-     -  simpl. unfold any_mapped_page in HMPage.
+     - simpl in *. destruct H;[|now contradict H].  subst. simpl. assumption.
+     -  simpl. simpl in *. destruct H;[|now contradict H].
+       unfold any_mapped_page in HMPage.
         subst.  simpl in H0. unfold  get_mapped_pte in H0. 
          rewrite HMPage in H0. 
          contradict H0.
@@ -381,10 +422,14 @@ try repeat split;trivial.
         simpl. right. trivial.
  + simpl in *.
      unfold page_notZero in HPNzero.
+   rewrite in_app_iff in H.
+   apply permut_or in H.
+      
 
     destruct H as [H | H]; destruct H0 as [H0 | H0].
-     - subst. simpl. assumption.
-     -  simpl. unfold any_mapped_page in HMPage.
+     - destruct H;[|now contradict H]. subst. simpl.  
+       assumption.
+     - destruct H;[|now contradict H]. subst.  simpl. unfold any_mapped_page in HMPage.
         subst.  simpl in H0. unfold  get_mapped_pte in H0. 
          rewrite HMPage in H0. 
          contradict H0.
@@ -409,7 +454,9 @@ try repeat split;trivial.
      apply beq_nat_true in H.
      exists x.
      intros. 
-     split. right. 
+     split.
+     rewrite in_app_iff.
+     left.  
      intuition.  assumption.   
      intros. 
      apply beq_nat_false in H.
@@ -419,8 +466,8 @@ try repeat split;trivial.
      cr3_save := s.(HMonad.cr3);
      stack_process := x.(stack_process) |}.
      split.
-     right.
-     destruct HCurx.
+     apply in_app_iff.
+     left.     destruct HCurx.
      rewrite <- H1.
      replace {|
   eip := x.(eip);
@@ -431,6 +478,34 @@ try repeat split;trivial.
      intuition.
 Qed.
 
+Lemma free_not_zero_prop s page pos :
+memory_length s ->
+page < nb_page ->
+Not_free_aux page s.(data) pos ->
+ Free_notZero_aux s.(data) pos ->
+Free_notZero_aux
+  (init_zero (page * page_size) page_size s.(data)) pos.
+Proof.
+intros HData HP HNFree HF. 
+induction HF.
+constructor. 
+assumption.
+constructor 2.
+assumption. assumption.
+fold init_zero.
+rewrite <- init_zero_nth;trivial. 
+apply IHHF. 
+inversion HNFree.
+constructor.
+contradict H1. intuition. 
+assumption.
+inversion HNFree. 
+contradict H1.
+intuition. 
+apply not_eq_and_le_lt;trivial.
+unfold page_size. simpl.
+omega.
+Qed.
 
 Lemma init_process_page_table_invariant new_cr3:
 {{ fun s :state => isolation s.(data) s.(process_list)  /\ consistent s /\
@@ -688,39 +763,7 @@ eapply weaken.
 unfold free_notZero in *. simpl.
 destruct HCons as (HRFree & HNCyc & HData (*& HPTlen*) & HNDup &  (HU & HF) & Hcurp).
 unfold init_zero.
-unfold Not_free in *.
-Lemma free_not_zero_prop s page pos :
-memory_length s ->
-page < nb_page ->
-Not_free_aux page s.(data) pos ->
- Free_notZero_aux s.(data) pos ->
-Free_notZero_aux
-  (init_zero (page * page_size) page_size s.(data)) pos.
-Proof.
-
-
-intros HData HP HNFree HF. 
-induction HF.
-constructor. 
-assumption.
-constructor 2.
-assumption. assumption.
-fold init_zero.
-rewrite <- init_zero_nth;trivial. 
-apply IHHF. 
-
-inversion HNFree.
-constructor.
-
-contradict H1. intuition. 
-assumption.
-inversion HNFree. 
-contradict H1.
-intuition. 
-apply not_eq_and_le_lt;trivial.
-unfold page_size. simpl.
-          omega.
-Qed. 
+unfold Not_free in *. 
 apply free_not_zero_prop;trivial.
 - unfold currProcess_inProcessList in *.
   simpl in *.
@@ -773,7 +816,7 @@ apply free_not_zero_prop;trivial.
          + reflexivity.
          + rewrite <- Hdata. rewrite mult_comm with page_size nb_page. apply mult_le_compat_r.
            intuition. 
-        }
+        } 
     - intuition. 
     - assumption.
 Qed. 

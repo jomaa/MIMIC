@@ -1,5 +1,5 @@
 (******************************************************************************)
-(*  © Université Lille 1 (2014-2016)                                          *)
+(*  © Université Lille 1 (2014-2017)                                          *)
 (*                                                                            *)
 (*  This software is a computer program whose purpose is to run a minimal,    *)
 (*  hypervisor relying on proven properties such as memory isolation.         *)
@@ -31,60 +31,56 @@
 (*  knowledge of the CeCILL license and that you accept its terms.            *)
 (******************************************************************************)
 
-Require Import List Streams.
-Import List.ListNotations.
-Require Import Step HMonad.
+Require Import List Streams Omega.
+Import List.ListNotations .
+Require Import  HMonad Properties ProcessManager Step.
 
 Set Printing Projections.
 
-CoFixpoint no_intr (_ : unit) : Stream (option nat) := Cons None (no_intr tt).
 
-Definition intr : Stream (option nat) :=  
+
+CoFixpoint intr : Stream (option nat) :=  
  Cons None (Cons None (Cons None (Cons None (Cons None
 (Cons None (Cons None (Cons None (Cons (Some 0) 
-(Cons None (Cons (Some 1)(Cons None (Cons None 
+(Cons None (Cons (Some 3)(Cons None (Cons None 
 (Cons None (Cons None (Cons None (Cons None 
 (Cons None (Cons None (Cons None (Cons (Some 0) 
-(Cons None (Cons None (Cons None (Cons (Some 2) (Cons None  (no_intr tt)))))))))))))))))))))))))).
+(Cons None (Cons None (Cons None (Cons (Some 2) (Cons None  intr))))))))))))))))))))))))).
 
 Definition progr := [Switch_process (*0*); Iret         (*1*); Nop           (*2*); Add_pte 3 1   (*3*); 
                      Write 16 17    (*4*); Load 17      (*5*); Free 17       (*6*); Exit          (*7*); 
-                     Nop            (*8*); Add_pte 3 1  (*9*); Add_pte 3 2  (*10*); Write 102 17 (*11*); 
+                     Trap 1         (*8*); Add_pte 3 1  (*9*); Add_pte 3 2  (*10*); Write 102 17 (*11*); 
                      Nop           (*12*); Load 17     (*13*); Free 17      (*14*); Exit         (*15*); 
                      Halt          (*16*); Load 2      (*17*); Nop          (*18*); Iret         (*19*); 
-                     Reset         (*20*); Iret        (*21*); Nop          (*22*); Iret         (*23*)].
+                  Create_process 2 (*20*); Iret        (*21*); Nop          (*22*); Iret         (*23*)].
 
-Definition data_mem := [0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0; 
-                        2;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0; 
-                        3;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0; 
-                        4;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0; 
-                        5;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;
-                        6;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;
-                        7;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;
-                        8;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0].
 
-Definition my_process : process := {| cr3_save := 0; eip:= 0; 
-                                      process_kernel_mode:= false;
-                                      stack_process :=[] |}.
-
-Definition init  :  state := 
+Definition init := 
 {|
-  process_list := [];
-  current_process := my_process;
-  cr3 := 0;
-  intr_table := [0; 22; 16];
+  process_list := [{| eip := 8; process_kernel_mode := false; cr3_save := 1; stack_process := [] |}];
+  current_process := {| eip := 8; process_kernel_mode := false; cr3_save := 1; stack_process := [] |};
+  cr3 := 1;
+  intr_table := [0; 20; 16; 22];
   interruptions := intr;
-  kernel_mode := true;
-  pc := 20;
+  kernel_mode := false;
+  pc := 8;
   code := progr;
   stack := [];
   register :=0; 
-  first_free_page := 1;
-  data := data_mem |} .
-
+  first_free_page := 2;
+  data :=  [0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0; 
+            0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0; 
+            3;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0; 
+            4;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0; 
+            5;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;
+            6;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;
+            7;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;
+            8;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0] |} .
+Definition boot := 
+modify (fun s => init ).
 (*
-Eval vm_compute in run (loop 0) init.
-Eval vm_compute in run (loop 1) init. (* reset : add 2 processes *)
+Eval vm_compute in run (loop 0) init. (* interrupt 3 *)
+Eval vm_compute in run (loop 1) init. (* create new process *)
 Eval vm_compute in run (loop 2) init. (* Iret *)
 Eval vm_compute in run (loop 3) init. (* Nop *) 
 Eval vm_compute in run (loop 4) init. (* Add_pte 3 1 *)
@@ -124,3 +120,104 @@ Eval vm_compute in run (loop 37) init.
 Eval vm_compute in run (loop 38) init.
 Eval vm_compute in run (loop 39) init.
 *)
+Lemma init_invariant : 
+{{fun s => True }} boot 
+{{fun _ s => isolation s.(data) s.(process_list)  /\ consistent s}}.
+Proof.
+unfold boot.
+eapply weaken.
+eapply modify_wp.
+simpl.
+intros.
+split.
+(** isolation **)
+unfold isolation.
+simpl.
+intros.
+destruct H0 as [H0 | H0]; [| now contradict H0].
+destruct H1 as [H1 | H1]; [| now contradict H1].
+subst.
+simpl in *.   
+now contradict H2.
+(** consistent **)
+unfold consistent.
+simpl.
+intuition.
+(** really_free **)
++ unfold really_free.
+simpl.
+do 6 (constructor 2;
+unfold nb_page;
+unfold page_size;
+cbn; try
+omega).
+constructor 1.
+unfold nb_page;
+unfold page_size;
+cbn; try
+omega
+simpl. omega.
+(** not_cyclic **)
++ unfold not_cyclic.
+simpl.
+do 6 (constructor 2;
+unfold nb_page;
+unfold page_size;
+cbn; try
+omega).
+constructor 1;
+unfold nb_page;
+unfold page_size;
+cbn; try
+omega.
+(** memory_length **)
++ unfold memory_length.
+simpl. omega.
+(** noDuplic_processPages**)
++ unfold noDuplic_processPages.
+simpl. intros. destruct H0 as [H0 | H0]; [| now contradict H0].
+unfold PageTableManager.process_used_pages.
+simpl.
+unfold PageTableManager.get_mapped_pte.
+constructor.
+rewrite in_map_iff.
+subst.
+simpl.
+unfold not;intros.
+destruct H0;intuition.
+subst.
+simpl. constructor.
+(** page_notZero **)
++ unfold page_notZero.
+unfold used_notZero, free_notZero.
+simpl.
+split;intros.
+ destruct H0 as [H0 | H0]; [| now contradict H0].
+ unfold PageTableManager.get_mapped_pte in *.
+ destruct H1 as [H1 | H1].
+ subst.
+ simpl.
+ unfold nb_page;
+unfold page_size;
+cbn; try
+omega.
+subst.
+simpl in *.
+now contradict H1.
+do 6 (constructor 2;
+unfold nb_page;
+unfold page_size;
+cbn; try
+omega).
+constructor 1;
+unfold nb_page;
+unfold page_size;
+cbn; try
+omega.
+(** currProcess_inProcessList **)
++ unfold currProcess_inProcessList.
+simpl.
+exists {| eip := 8; process_kernel_mode := false; cr3_save := 1; stack_process := [] |}.
+simpl.
+intuition.
+Qed.

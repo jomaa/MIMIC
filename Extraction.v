@@ -1,5 +1,5 @@
 (******************************************************************************)
-(*  © Université Lille 1 (2014-2016)                                          *)
+(*  © Université Lille 1 (2014-2017)                                          *)
 (*                                                                            *)
 (*  This software is a computer program whose purpose is to run a minimal,    *)
 (*  hypervisor relying on proven properties such as memory isolation.         *)
@@ -31,65 +31,10 @@
 (*  knowledge of the CeCILL license and that you accept its terms.            *)
 (******************************************************************************)
 
-Require Import List Arith NPeano Coq.Logic.JMeq Coq.Logic.Classical_Prop.
-Import List.ListNotations .
-Require Import Lib StateMonad HMonad MMU Alloc_invariants
- Properties LibOs PageTableManager MemoryManager MMU_invariant.
-Require Import Coq.Structures.OrderedTypeEx.
+Require Import StateMonad MMU.
 
-Set Printing Projections.
-
-Definition write_aux (val Paddr: nat) := 
-let page := getBase Paddr offset_nb_bits in 
-let index := getOffset Paddr offset_nb_bits in  
- modify (fun s =>  {|
-    process_list := s.(process_list);
-    current_process := s.(current_process);
-    cr3 := s.(cr3);
-    intr_table := s.(intr_table);
-    interruptions := s.(interruptions);
-    kernel_mode := s.(kernel_mode);
-    pc := s.(pc);
-    code := s.(code);
-    stack := s.(stack);
-    register := s.(register);
-    first_free_page := s.(first_free_page);
-    data := firstn (page * page_size) s.(data) ++
-             update_sublist index val
-               (sublist (page * page_size) page_size s.(data)) ++
-             skipn (page * page_size + nb_pte) s.(data)   
-|}).
-Lemma write_aux_wp (val Paddr: nat) (P : unit-> state-> Prop) :
-let page := getBase Paddr offset_nb_bits in 
-let index := getOffset Paddr offset_nb_bits in  
-{{fun s => P tt {|
-    process_list := s.(process_list);
-    current_process := s.(current_process);
-    cr3 := s.(cr3);
-    intr_table := s.(intr_table);
-    interruptions := s.(interruptions);
-    kernel_mode := s.(kernel_mode);
-    pc := s.(pc);
-    code := s.(code);
-    stack := s.(stack);
-    register := s.(register);
-    first_free_page := s.(first_free_page);
-    data := firstn (page * page_size) s.(data) ++
-             update_sublist index val
-               (sublist (page * page_size) page_size s.(data)) ++
-             skipn (page * page_size + nb_pte) s.(data) |}
-}}
-write_aux val Paddr {{ P }}.
-Proof.
-simpl.
-apply modify_wp.
-Qed.
+(* 
 
 
-Definition write (val Vaddr : nat) := 
-perform Paddr := translate Vaddr in 
-match Paddr with 
-|inl paddr => write_aux val paddr
-|inr _ => ret tt
-end.
-
+ Extraction  Language Haskell.
+ Recursive Extraction Library MMU. *)

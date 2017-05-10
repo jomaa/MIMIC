@@ -1,5 +1,5 @@
 (******************************************************************************)
-(*  © Université Lille 1 (2014-2016)                                          *)
+(*  © Université Lille 1 (2014-2017)                                          *)
 (*                                                                            *)
 (*  This software is a computer program whose purpose is to run a minimal,    *)
 (*  hypervisor relying on proven properties such as memory isolation.         *)
@@ -40,7 +40,7 @@ Set Printing Projections.
 
 (** add new process **) 
 Definition add_new_process (cr3_p : nat) (eip_p : nat) : M unit := 
-modify (fun s =>  {| process_list := {| eip :=eip_p; process_kernel_mode := false; cr3_save := cr3_p;stack_process:= []|} ::s.(process_list);
+modify (fun s =>  {|process_list := s.(process_list)++ [{| eip :=eip_p; process_kernel_mode := false; cr3_save := cr3_p; stack_process := []|}];
                      current_process := s.(current_process);
                      cr3 := s.(cr3);
                      intr_table := s.(intr_table);
@@ -55,7 +55,7 @@ modify (fun s =>  {| process_list := {| eip :=eip_p; process_kernel_mode := fals
 
 (** add new process WP **) 
 Lemma add_new_process_wp (cr3_p eip_p : nat) (P : unit-> state-> Prop) :
-{{fun s => P tt {| process_list := {| eip :=eip_p; process_kernel_mode := false; cr3_save := cr3_p; stack_process := []|} ::s.(process_list);
+{{fun s => P tt {| process_list := s.(process_list)++ [{| eip :=eip_p; process_kernel_mode := false; cr3_save := cr3_p; stack_process := []|}];
                    current_process := s.(current_process);
                    cr3 := s.(cr3);
                    intr_table := s.(intr_table);
@@ -165,4 +165,4 @@ Qed.
 
 
 Definition reset : M unit:= 
-create_process 2 ;; create_process 8;; init_current_process . 
+(* create_process 2 ;; *) create_process 8;; init_current_process . 

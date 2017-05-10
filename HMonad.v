@@ -1,5 +1,5 @@
 (******************************************************************************)
-(*  © Université Lille 1 (2014-2016)                                          *)
+(*  © Université Lille 1 (2014-2017)                                          *)
 (*                                                                            *)
 (*  This software is a computer program whose purpose is to run a minimal,    *)
 (*  hypervisor relying on proven properties such as memory isolation.         *)
@@ -42,9 +42,9 @@ Inductive result' (A : Type) : Type :=
 | hlt : result' A
 | undef : result' A.
 
-Implicit Arguments val [ A ].
-Implicit Arguments hlt [ A ].
-Implicit Arguments undef [ A ].
+Arguments val [ A ].
+Arguments hlt [ A ].
+Arguments undef [ A ].
 
 Inductive instr : Type :=
 | Nop
@@ -55,12 +55,13 @@ Inductive instr : Type :=
 | Add_pte (permission index: nat) 
 | Switch_process
 | Reset
+| Create_process (eip : nat)
 | Free (page : nat)
 | Write (val Vaddr : nat)
 | Exit.
 
 Record process : Type := {
-  eip : nat;
+  eip : nat; 
   process_kernel_mode : bool;
   cr3_save : nat;
   stack_process : list nat

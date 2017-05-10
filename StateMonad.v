@@ -1,5 +1,5 @@
 (******************************************************************************)
-(*  © Université Lille 1 (2014-2016)                                          *)
+(*  © Université Lille 1 (2014-2017)                                          *)
 (*                                                                            *)
 (*  This software is a computer program whose purpose is to run a minimal,    *)
 (*  hypervisor relying on proven properties such as memory isolation.         *)
@@ -34,7 +34,7 @@
 (** The state monad *)
 
 (** * The signature of a state monad module *)
-
+Require Import List.
 Module Type STATE_MONAD.
 
 Parameter state : Type.
@@ -125,7 +125,7 @@ End STATE_MONAD.
 
 Module Make_StateMonadPlus (M : STATE_MONAD).
 
-Require Import List.
+
 Import M.
 
 Lemma bind_wp_rev (A B : Type) (m : M A) (f : A -> M B) (P : state -> Prop)( Q : A -> state -> Prop) (R : B -> state -> Prop) :
